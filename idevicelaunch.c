@@ -1,6 +1,6 @@
 /**
  * @file idevicelaunch.c
- * @brief Launch or stop an app on device using its bundle id.
+ * @brief Launch an app on device using its bundle id.
  * \internal
  *
  * Copyright (c) 2020 Demiurge Studios Inc. All rights reserved.
@@ -27,7 +27,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-/* number of arguments expected: idevicelaunch [start|stop] BUNDLEID */
+/* number of arguments expected: idevicelaunch start BUNDLEID */
 #define IDR_ARGC 3
 
 /* convenience types. */
@@ -256,8 +256,8 @@ int main(int argc, char** argv) {
 	}
 
 	/* check arguments. */
-	if (IDR_ARGC != argc || (0 != strcmp(argv[1], "start") && 0 != strcmp(argv[1], "stop"))) {
-		fprintf(stderr, "Usage: %s [start|stop] BUNDLEID [ARGS...]\n", idl_process_name);
+	if (IDR_ARGC != argc || 0 != strcmp(argv[1], "start")) {
+		fprintf(stderr, "Usage: %s start BUNDLEID [ARGS...]\n", idl_process_name);
 		return ret;
 	}
 
@@ -339,27 +339,26 @@ int main(int argc, char** argv) {
 	/* now running. */
 	running = IDR_TRUE;
 
-	/* unless stopping, detach and leaving running. */
-	if (0 != strcmp("stop", action)) {
-		/* "set the thread for subsequent actions" - see RNBRemote::HandlePacket_H
-		 * Hc0 - H is thread set, c is "step/continue" ops, and -1 says "all threads". */
-		if (!idl_run_command(ds, "Hc-1")) {
-			goto error;
-		}
+	/* detach and leaving running. */
 
-		/* continue - no explicit response */
-		if (!idl_run_command_ex(ds, "c", 0, NULL, NULL)) {
-			goto error;
-		}
-
-		/* detach the debugger - responds with "OK", but we'll be seeing responses
-		 * from the results of the continue, so we ignore. */
-		if (!idl_run_command_ex(ds, "D", 0, NULL, NULL)) {
-			goto error;
-		}
-
-		leave_running = IDR_TRUE;
+	/* "set the thread for subsequent actions" - see RNBRemote::HandlePacket_H
+	 * Hc0 - H is thread set, c is "step/continue" ops, and -1 says "all threads". */
+	if (!idl_run_command(ds, "Hc-1")) {
+		goto error;
 	}
+
+	/* continue - no explicit response */
+	if (!idl_run_command_ex(ds, "c", 0, NULL, NULL)) {
+		goto error;
+	}
+
+	/* detach the debugger - responds with "OK", but we'll be seeing responses
+	 * from the results of the continue, so we ignore. */
+	if (!idl_run_command_ex(ds, "D", 0, NULL, NULL)) {
+		goto error;
+	}
+
+	leave_running = IDR_TRUE;
 
 	/* done. */
 	ret = 0;
@@ -368,7 +367,7 @@ int main(int argc, char** argv) {
 error:
 	if (running && !leave_running) {
 		if (NULL != ds) {
-			/* kill command - either "stop" handling, or to deal with an unexpected error. */
+			/* kill command to deal with an unexpected error. */
 			idl_run_command_ex(ds, "k", 0, NULL, NULL);
 		}
 	}
